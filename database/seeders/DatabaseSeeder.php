@@ -2,24 +2,27 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
 use Illuminate\Database\Seeder;
 
+/**
+ * Seeders seguros para correr en producción. Todos son idempotentes y no
+ * dependen de fakerphp/faker (que vive en require-dev y no está disponible
+ * en builds de producción).
+ *
+ * Los usuarios se crean por separado con `php artisan app:create-admin`,
+ * no acá.
+ */
 class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
-
         $this->call([
             WarehouseSeeder::class,
             FamilySeeder::class,
             AttributeSeeder::class,
             FamilyAttributeSeeder::class,
             DemoProductSeeder::class,
+            DemoStockSeeder::class,
         ]);
     }
 }
