@@ -248,16 +248,28 @@ class extends Component {
         {{-- ESTADO: confirm (SKU encontrado, pedir cantidad) --}}
         @if ($step === 'confirm' && $this->sku)
             <div class="rounded-2xl bg-white dark:bg-zinc-900 p-5 shadow-sm border border-zinc-200 dark:border-zinc-800">
-                <flux:text size="xs" class="text-zinc-500 uppercase tracking-wide">Producto</flux:text>
-                <flux:heading class="mt-1">{{ $this->sku->product?->name }}</flux:heading>
-                @if ($this->sku->variant_name)
-                    <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">{{ $this->sku->variant_name }}</flux:text>
-                @endif
-                <div class="mt-3 flex items-center gap-2">
-                    <code class="text-xs font-mono">{{ $this->sku->internal_code }}</code>
-                    <flux:badge size="sm" :color="$this->availableStock > 0 ? 'green' : 'red'" inset="top bottom">
-                        {{ rtrim(rtrim(number_format($this->availableStock, 2), '0'), '.') }} en stock
-                    </flux:badge>
+                <div class="flex gap-4">
+                    @if ($this->sku->photo)
+                        <img
+                            src="{{ $this->sku->photo }}"
+                            alt="{{ $this->sku->product?->name }}"
+                            class="size-24 rounded-xl object-cover bg-zinc-100 dark:bg-zinc-800 shrink-0"
+                            loading="lazy"
+                        >
+                    @endif
+                    <div class="flex-1 min-w-0">
+                        <flux:text size="xs" class="text-zinc-500 uppercase tracking-wide">Producto</flux:text>
+                        <flux:heading class="mt-1">{{ $this->sku->product?->name }}</flux:heading>
+                        @if ($this->sku->variant_name)
+                            <flux:text class="mt-1 text-zinc-600 dark:text-zinc-400">{{ $this->sku->variant_name }}</flux:text>
+                        @endif
+                        <div class="mt-3 flex items-center gap-2 flex-wrap">
+                            <code class="text-xs font-mono">{{ $this->sku->internal_code }}</code>
+                            <flux:badge size="sm" :color="$this->availableStock > 0 ? 'green' : 'red'" inset="top bottom">
+                                {{ rtrim(rtrim(number_format($this->availableStock, 2), '0'), '.') }} en stock
+                            </flux:badge>
+                        </div>
+                    </div>
                 </div>
 
                 @if ($this->sku->sale_price !== null)
