@@ -10,6 +10,16 @@ Route::view('/', 'welcome')->name('home');
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::livewire('dashboard', 'pages::dashboard.index')->name('dashboard');
 
+    // Versión móvil de la app — pensada para el vendedor con celular en tienda.
+    // Layout sin sidebar, optimizada para una sola mano.
+    Route::prefix('m')->name('m.')->group(function () {
+        Route::livewire('/', 'pages::m.index')->name('index');
+        Route::livewire('vender', 'pages::m.sell')->name('sell');
+        Route::livewire('consultar', 'pages::m.lookup')->name('lookup');
+        Route::livewire('reportar-danado', 'pages::m.damage')->name('damage');
+        Route::livewire('mis-ventas', 'pages::m.history')->name('history');
+    });
+
     Route::livewire('users', 'pages::users.index')->name('users.index');
     Route::livewire('warehouses', 'pages::warehouses.index')->name('warehouses.index');
     Route::livewire('families', 'pages::families.index')->name('families.index');

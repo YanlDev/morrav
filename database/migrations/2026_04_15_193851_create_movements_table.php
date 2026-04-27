@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('movements', function (Blueprint $table) {
             $table->id();
             $table->string('number', 20)->unique();
-            $table->enum('type', ['inbound', 'outbound', 'transfer', 'adjustment', 'initial_load']);
+            $table->enum('type', ['inbound', 'outbound', 'transfer', 'adjustment', 'initial_load', 'sale']);
             $table->dateTime('occurred_at');
             $table->string('reason', 255)->nullable();
             $table->string('reference_type', 50)->nullable();

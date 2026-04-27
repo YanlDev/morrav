@@ -20,6 +20,7 @@ new #[Title('Movimientos')] class extends Component {
         'transfer' => 'Traspaso',
         'adjustment' => 'Ajuste',
         'initial_load' => 'Carga inicial',
+        'sale' => 'Venta',
     ];
 
     public const STATUSES = [
