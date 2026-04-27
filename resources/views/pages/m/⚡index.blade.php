@@ -42,11 +42,18 @@ class extends Component {
 }; ?>
 
 <div class="flex flex-col flex-1 px-5 py-6 gap-6">
-    {{-- Cabecera con saludo + ventas del día --}}
+    {{-- Cabecera con avatar + saludo --}}
     <header class="flex items-center justify-between">
-        <div>
-            <flux:text size="sm" class="text-zinc-500">Hola,</flux:text>
-            <flux:heading size="lg">{{ auth()->user()->name }}</flux:heading>
+        <div class="flex items-center gap-3">
+            <div class="size-11 rounded-full bg-[#8E1E3A] text-white flex items-center justify-center text-sm font-bold uppercase tracking-wide shadow-sm ring-1 ring-black/5">
+                {{ auth()->user()->initials() }}
+            </div>
+            <div>
+                <flux:text size="xs" class="uppercase tracking-[0.2em] text-zinc-400 font-medium">Hola</flux:text>
+                <flux:heading size="lg" class="uppercase leading-tight font-bold">
+                    {{ \Illuminate\Support\Str::of(auth()->user()->name)->before(' ') }}
+                </flux:heading>
+            </div>
         </div>
 
         <flux:dropdown align="end">
