@@ -277,11 +277,50 @@ $primaryStore = $stores[0];
   }
   .menu-toggle svg { width: 20px; height: 20px; }
 
+  /* Panel móvil: oculto por defecto, abre al tocar el toggle */
+  .mobile-menu {
+    display: none;
+  }
+  .mobile-menu-links {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+  }
+  .mobile-menu-links a {
+    display: block;
+    padding: var(--space-3) 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--color-charcoal);
+    border-bottom: 1px solid var(--color-border);
+  }
+  .mobile-menu-links a:hover { color: var(--color-wine); }
+  .mobile-auth {
+    width: 100%;
+    justify-content: center;
+    margin-top: var(--space-4);
+  }
+
   @media (max-width: 880px) {
     .nav-links { display: none; }
     .menu-toggle { display: inline-flex; }
     .nav-actions .btn-secondary,
-    .nav-actions .btn-ghost { display: none; }
+    .nav-actions .desktop-auth { display: none; }
+
+    .mobile-menu.is-open {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: var(--color-cream);
+      padding: var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+      box-shadow: 0 8px 24px rgba(20, 20, 20, 0.08);
+      z-index: 50;
+    }
   }
 
   /* ============== HERO ============== */
@@ -1185,19 +1224,40 @@ $primaryStore = $stores[0];
     </nav>
     <div class="nav-actions">
       @auth
-        <a href="{{ route('dashboard') }}" class="btn btn-ghost" title="Ir al panel interno">
+        <a href="{{ route('dashboard') }}" class="btn btn-ghost desktop-auth" title="Ir al panel interno">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
           Mi panel
         </a>
       @else
-        <a href="{{ route('login') }}" class="btn btn-ghost" title="Acceso para personal de Morrav Office">
+        <a href="{{ route('login') }}" class="btn btn-ghost desktop-auth" title="Acceso para personal de Morrav Office">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
           Iniciar sesión
         </a>
       @endauth
-      <button class="menu-toggle" aria-label="Menu">
+      <button class="menu-toggle" aria-label="Menu" aria-expanded="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
       </button>
+    </div>
+
+    {{-- Panel móvil: links + acción de auth en un solo lugar --}}
+    <div class="mobile-menu" id="mobileMenu">
+      <ul class="mobile-menu-links">
+        <li><a href="#lineas">Líneas</a></li>
+        <li><a href="#contratos">Contratos</a></li>
+        <li><a href="#tiendas">Tiendas</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ul>
+      @auth
+        <a href="{{ route('dashboard') }}" class="btn btn-primary mobile-auth">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+          Mi panel
+        </a>
+      @else
+        <a href="{{ route('login') }}" class="btn btn-primary mobile-auth">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg>
+          Iniciar sesión
+        </a>
+      @endauth
     </div>
   </div>
 </header>
@@ -1951,21 +2011,19 @@ $primaryStore = $stores[0];
     }, 900);
   }
 
-  // Mobile menu (basic)
+  // Menú móvil: toggle del panel + cierre al tocar un link
   const menuToggle = document.querySelector('.menu-toggle');
-  if (menuToggle) {
+  const mobileMenu = document.getElementById('mobileMenu');
+  if (menuToggle && mobileMenu) {
     menuToggle.addEventListener('click', () => {
-      const links = document.querySelector('.nav-links');
-      const isOpen = links.style.display === 'flex';
-      Object.assign(links.style, isOpen ? { display: 'none' } : {
-        display: 'flex',
-        position: 'absolute',
-        top: '76px', left: 0, right: 0,
-        flexDirection: 'column',
-        background: 'var(--color-cream)',
-        padding: 'var(--space-5)',
-        borderBottom: '1px solid var(--color-border)',
-        gap: 'var(--space-4)'
+      const isOpen = mobileMenu.classList.toggle('is-open');
+      menuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
+    mobileMenu.querySelectorAll('a').forEach(link => {
+      link.addEventListener('click', () => {
+        mobileMenu.classList.remove('is-open');
+        menuToggle.setAttribute('aria-expanded', 'false');
       });
     });
   }
