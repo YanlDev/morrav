@@ -63,6 +63,18 @@ new #[Title('Órdenes de reparación')] class extends Component {
         return app(RepairOrderService::class)->repairableSkus();
     }
 
+    /**
+     * Resumen de stock pendiente en taller (sin orden abierta) para mostrar
+     * un aviso en la cabecera.
+     *
+     * @return array{units: float, skus: int}
+     */
+    #[Computed]
+    public function pendingStats(): array
+    {
+        return app(RepairOrderService::class)->pendingInWorkshopStats();
+    }
+
     public function openCreate(): void
     {
         $this->authorize('create', RepairOrder::class);
@@ -148,6 +160,26 @@ new #[Title('Órdenes de reparación')] class extends Component {
             @endcan
         </div>
 
+        @if ($this->pendingStats['units'] > 0)
+            <div class="rounded-xl border border-amber-200 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-950/30 p-4 flex items-start gap-3" data-test="pending-banner">
+                <flux:icon.exclamation-triangle class="size-5 text-amber-600 shrink-0 mt-0.5" />
+                <div class="flex-1">
+                    <flux:heading size="sm">Hay stock en taller esperando una orden</flux:heading>
+                    <flux:text class="mt-0.5">
+                        {{ rtrim(rtrim(number_format($this->pendingStats['units'], 2), '0'), '.') }}
+                        unidades en {{ $this->pendingStats['skus'] }}
+                        {{ $this->pendingStats['skus'] === 1 ? 'variante' : 'variantes' }}.
+                        Abrí una orden para empezar a repararlas.
+                    </flux:text>
+                </div>
+                @can('create', App\Models\RepairOrder::class)
+                    <flux:button variant="primary" size="sm" wire:click="openCreate">
+                        Abrir orden
+                    </flux:button>
+                @endcan
+            </div>
+        @endif
+
         <flux:select wire:model.live="statusFilter" placeholder="Todos los estados" class="sm:w-48">
             <flux:select.option value="">Todos los estados</flux:select.option>
             @foreach (static::STATUSES as $v => $l)
@@ -205,7 +237,11 @@ new #[Title('Órdenes de reparación')] class extends Component {
                 @empty
                     <flux:table.row>
                         <flux:table.cell colspan="6" class="text-center text-zinc-500 py-8">
-                            Aún no hay órdenes de reparación.
+                            @if ($this->pendingStats['units'] > 0)
+                                Aún no hay órdenes abiertas. Hay stock en taller esperando — abrí la primera con el botón de arriba.
+                            @else
+                                Aún no hay órdenes de reparación. Cuando reportes unidades dañadas y abras una orden, van a aparecer acá.
+                            @endif
                         </flux:table.cell>
                     </flux:table.row>
                 @endforelse

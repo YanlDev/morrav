@@ -205,6 +205,56 @@ class RepairOrderService
     }
 
     /**
+     * Resumen de stock en taller que aún no está reclamado por ninguna
+     * orden abierta. Sirve para alertar en el listado que hay trabajo pendiente.
+     *
+     * @return array{units: float, skus: int}
+     */
+    public function pendingInWorkshopStats(): array
+    {
+        $workshop = $this->workshopWarehouse();
+
+        // Stock confirmado por SKU en TALLER.
+        $stockRows = DB::table('movement_lines as ml')
+            ->join('movements as m', 'ml.movement_id', '=', 'm.id')
+            ->where('ml.warehouse_id', $workshop->id)
+            ->where('m.status', 'confirmed')
+            ->groupBy('ml.sku_id')
+            ->select('ml.sku_id')
+            ->selectRaw("SUM(CASE WHEN ml.direction = 'in' THEN ml.quantity ELSE -ml.quantity END) as qty")
+            ->havingRaw("SUM(CASE WHEN ml.direction = 'in' THEN ml.quantity ELSE -ml.quantity END) > 0")
+            ->get();
+
+        if ($stockRows->isEmpty()) {
+            return ['units' => 0.0, 'skus' => 0];
+        }
+
+        // Cantidad reclamada por órdenes abiertas, por SKU.
+        $claimed = DB::table('repair_order_lines as rol')
+            ->join('repair_orders as ro', 'rol.repair_order_id', '=', 'ro.id')
+            ->where('ro.status', 'open')
+            ->groupBy('rol.sku_id')
+            ->select('rol.sku_id')
+            ->selectRaw('SUM(rol.quantity_claimed) as claimed')
+            ->get()
+            ->keyBy('sku_id');
+
+        $totalUnits = 0.0;
+        $skuCount = 0;
+
+        foreach ($stockRows as $row) {
+            $available = (float) $row->qty - (float) ($claimed->get($row->sku_id)->claimed ?? 0);
+
+            if ($available > 0) {
+                $totalUnits += $available;
+                $skuCount++;
+            }
+        }
+
+        return ['units' => $totalUnits, 'skus' => $skuCount];
+    }
+
+    /**
      * SKUs con stock disponible para reparar (en taller, sin reclamar
      * por otra orden abierta).
      *
