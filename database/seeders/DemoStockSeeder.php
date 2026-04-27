@@ -57,6 +57,27 @@ class DemoStockSeeder extends Seeder
             return;
         }
 
+        // Una sola query bulk: stock actual por SKU × almacén.
+        $warehouseIds = $warehouses->pluck('id')->all();
+        $skuIds = $skus->pluck('id')->all();
+
+        $stockMap = [];
+        if ($warehouseIds !== [] && $skuIds !== []) {
+            $rows = DB::table('movement_lines as ml')
+                ->join('movements as m', 'ml.movement_id', '=', 'm.id')
+                ->whereIn('ml.sku_id', $skuIds)
+                ->whereIn('ml.warehouse_id', $warehouseIds)
+                ->where('m.status', 'confirmed')
+                ->groupBy('ml.sku_id', 'ml.warehouse_id')
+                ->select('ml.sku_id', 'ml.warehouse_id')
+                ->selectRaw("SUM(CASE WHEN ml.direction = 'in' THEN ml.quantity ELSE -ml.quantity END) as total")
+                ->get();
+
+            foreach ($rows as $row) {
+                $stockMap[(int) $row->sku_id][(int) $row->warehouse_id] = (float) $row->total;
+            }
+        }
+
         $linesToInsert = [];
 
         foreach (self::TARGETS as $code => $target) {
@@ -66,7 +87,7 @@ class DemoStockSeeder extends Seeder
             }
 
             foreach ($skus as $sku) {
-                $current = $sku->stockAt($warehouse->id);
+                $current = $stockMap[$sku->id][$warehouse->id] ?? 0.0;
                 $missing = $target - $current;
 
                 if ($missing > 0) {

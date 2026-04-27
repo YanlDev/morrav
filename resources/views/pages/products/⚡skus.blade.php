@@ -415,29 +415,30 @@ new #[Title('Producto')] class extends Component {
             ->orderBy('code')
             ->get();
 
-        $result = [];
+        $stocks = $sku->stockAtMany($warehouses->pluck('id')->all());
 
-        foreach ($warehouses as $wh) {
-            $qty = $sku->stockAt($wh->id);
-
-            if ($qty > 0) {
-                $result[] = ['warehouse' => $wh, 'qty' => $qty];
-            }
-        }
-
-        return $result;
+        return $warehouses
+            ->filter(fn (Warehouse $wh) => ($stocks[$wh->id] ?? 0) > 0)
+            ->map(fn (Warehouse $wh) => ['warehouse' => $wh, 'qty' => $stocks[$wh->id]])
+            ->values()
+            ->all();
     }
 
     #[Computed]
     public function damageMaxQuantity(): float
     {
-        if (! $this->damageSkuId || ! $this->damageOriginWarehouseId) {
+        if (! $this->damageOriginWarehouseId) {
             return 0.0;
         }
 
-        $sku = Sku::find($this->damageSkuId);
+        // Reusamos damageEligibleWarehouses (cacheada por Livewire) para evitar otra query.
+        foreach ($this->damageEligibleWarehouses as $row) {
+            if ($row['warehouse']->id === (int) $this->damageOriginWarehouseId) {
+                return (float) $row['qty'];
+            }
+        }
 
-        return $sku ? $sku->stockAt($this->damageOriginWarehouseId) : 0.0;
+        return 0.0;
     }
 
     public function reportDamage(): void

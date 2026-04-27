@@ -52,12 +52,11 @@ class extends Component {
     #[Computed]
     public function availableStock(): float
     {
-        if (! $this->skuId || ! $this->warehouseId) {
+        if (! $this->warehouseId || ! $this->sku) {
             return 0.0;
         }
-        $sku = Sku::find($this->skuId);
 
-        return $sku ? $sku->stockAt($this->warehouseId) : 0.0;
+        return $this->sku->stockAt($this->warehouseId);
     }
 
     public function lookupSku(): void

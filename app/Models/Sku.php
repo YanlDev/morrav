@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 
 #[Fillable([
     'product_id',
@@ -64,21 +65,50 @@ class Sku extends Model
 
     /**
      * Calcula el stock disponible en un almacén determinado.
+     * Una sola query con SUM(CASE) y JOIN explícito (más rápido que dos
+     * queries con whereHas correlacionado).
      */
     public function stockAt(int $warehouseId): float
     {
-        $inbound = (float) $this->movementLines()
-            ->where('warehouse_id', $warehouseId)
-            ->where('direction', 'in')
-            ->whereHas('movement', fn (Builder $query) => $query->where('status', 'confirmed'))
-            ->sum('quantity');
+        $total = DB::table('movement_lines as ml')
+            ->join('movements as m', 'ml.movement_id', '=', 'm.id')
+            ->where('ml.sku_id', $this->id)
+            ->where('ml.warehouse_id', $warehouseId)
+            ->where('m.status', 'confirmed')
+            ->selectRaw("SUM(CASE WHEN ml.direction = 'in' THEN ml.quantity ELSE -ml.quantity END) as total")
+            ->value('total');
 
-        $outbound = (float) $this->movementLines()
-            ->where('warehouse_id', $warehouseId)
-            ->where('direction', 'out')
-            ->whereHas('movement', fn (Builder $query) => $query->where('status', 'confirmed'))
-            ->sum('quantity');
+        return (float) ($total ?? 0);
+    }
 
-        return $inbound - $outbound;
+    /**
+     * Versión batch de stockAt: devuelve `[warehouse_id => qty]` para varios
+     * almacenes en una sola query. Úsalo cuando iteres almacenes para evitar N queries.
+     *
+     * @param  array<int, int>  $warehouseIds
+     * @return array<int, float>
+     */
+    public function stockAtMany(array $warehouseIds): array
+    {
+        if ($warehouseIds === []) {
+            return [];
+        }
+
+        $rows = DB::table('movement_lines as ml')
+            ->join('movements as m', 'ml.movement_id', '=', 'm.id')
+            ->where('ml.sku_id', $this->id)
+            ->whereIn('ml.warehouse_id', $warehouseIds)
+            ->where('m.status', 'confirmed')
+            ->groupBy('ml.warehouse_id')
+            ->select('ml.warehouse_id')
+            ->selectRaw("SUM(CASE WHEN ml.direction = 'in' THEN ml.quantity ELSE -ml.quantity END) as total")
+            ->get();
+
+        $result = array_fill_keys($warehouseIds, 0.0);
+        foreach ($rows as $row) {
+            $result[(int) $row->warehouse_id] = (float) $row->total;
+        }
+
+        return $result;
     }
 }
