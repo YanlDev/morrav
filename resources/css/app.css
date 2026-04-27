@@ -9,30 +9,50 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
 
+    /* Zinc tightened: zinc-400 era #a3a3a3 (falla WCAG AA sobre blanco, 2.83:1).
+       Subido a #757575 (4.6:1). zinc-800 alineado al charcoal de marca. */
     --color-zinc-50: #fafafa;
     --color-zinc-100: #f5f5f5;
     --color-zinc-200: #e5e5e5;
     --color-zinc-300: #d4d4d4;
-    --color-zinc-400: #a3a3a3;
-    --color-zinc-500: #737373;
-    --color-zinc-600: #525252;
-    --color-zinc-700: #404040;
-    --color-zinc-800: #262626;
-    --color-zinc-900: #171717;
-    --color-zinc-950: #0a0a0a;
+    --color-zinc-400: #757575;
+    --color-zinc-500: #5c5c5c;
+    --color-zinc-600: #4a4540;
+    --color-zinc-700: #2e2823;
+    --color-zinc-800: #1c1412;
+    --color-zinc-900: #14100e;
+    --color-zinc-950: #0a0807;
 
-    --color-accent: var(--color-neutral-800);
-    --color-accent-content: var(--color-neutral-800);
-    --color-accent-foreground: var(--color-white);
+    /* Marca Morrav: usar via bg-brand-500, text-brand-600, etc. */
+    --color-brand-50:  #faf8f3;
+    --color-brand-100: #f0ead9;
+    --color-brand-200: #e8e2d3;
+    --color-brand-300: #c9c2b5;
+    --color-brand-500: #8e1e3a;
+    --color-brand-600: #7a1832;
+    --color-brand-700: #5f1228;
+    --color-brand-800: #3a0e1e;
+
+    /* Estados semánticos consistentes con landing */
+    --color-success-500: #2f5233;
+    --color-warning-500: #d4a017;
+    --color-danger-500:  #a8201a;
+
+    /* Accent de Flux apuntando a wine de marca */
+    --color-accent: var(--color-brand-500);
+    --color-accent-content: var(--color-brand-600);
+    --color-accent-foreground: #faf8f3;
 }
 
 @layer theme {
     .dark {
-        --color-accent: var(--color-white);
-        --color-accent-content: var(--color-white);
-        --color-accent-foreground: var(--color-neutral-800);
+        /* En dark, usar wine ligeramente más claro para contraste sobre fondo oscuro */
+        --color-accent: #b32a4a;
+        --color-accent-content: #c93356;
+        --color-accent-foreground: #faf8f3;
     }
 }
 
@@ -44,6 +64,19 @@
     ::backdrop,
     ::file-selector-button {
         border-color: var(--color-gray-200, currentColor);
+    }
+
+    /* Inter stylistic alternates: 1/4/6/9 más legibles, sin "loops" cerrados.
+       Mejora lectura de números en tablas de stock, SKUs, RUC, etc. */
+    body {
+        font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11', 'ss01', 'ss03';
+    }
+
+    /* Numerales tabulares: alineación vertical en columnas numéricas */
+    .tabular-nums,
+    table td,
+    .mono {
+        font-variant-numeric: tabular-nums;
     }
 }
 
@@ -60,7 +93,3 @@ textarea:focus[data-flux-control],
 select:focus[data-flux-control] {
     @apply outline-hidden ring-2 ring-accent ring-offset-2 ring-offset-accent-foreground;
 }
-
-/* \[:where(&)\]:size-4 {
-    @apply size-4;
-} */

@@ -21,3 +21,9 @@ yarn-error.log
 /.nova
 /.vscode
 /.zed
+/.claude
+/.mcp.json
+/junit.xml
+/PLAN.md
+/ERD.md
+/CLAUDE.md

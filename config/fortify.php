@@ -144,7 +144,8 @@ return [
     */
 
     'features' => [
-        Features::registration(),
+        // Registration is intentionally disabled. New users are provisioned by an
+        // admin via UI or via the `php artisan app:create-admin` command.
         Features::resetPasswords(),
         Features::emailVerification(),
         Features::twoFactorAuthentication([

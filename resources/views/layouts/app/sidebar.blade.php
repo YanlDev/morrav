@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="dark">
+<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         @include('partials.head')
     </head>
@@ -11,24 +11,84 @@
             </flux:sidebar.header>
 
             <flux:sidebar.nav>
-                <flux:sidebar.group :heading="__('Platform')" class="grid">
+                <flux:sidebar.group heading="Operación" class="grid">
                     <flux:sidebar.item icon="home" :href="route('dashboard')" :current="request()->routeIs('dashboard')" wire:navigate>
-                        {{ __('Dashboard') }}
+                        Dashboard
                     </flux:sidebar.item>
+                    @can('viewAny', App\Models\Movement::class)
+                        <flux:sidebar.item icon="chart-bar" :href="route('stock.index')" :current="request()->routeIs('stock.*')" wire:navigate>
+                            Stock
+                        </flux:sidebar.item>
+                        <flux:sidebar.item icon="arrows-right-left" :href="route('movements.index')" :current="request()->routeIs('movements.*')" wire:navigate>
+                            Movimientos
+                        </flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', App\Models\RepairOrder::class)
+                        <flux:sidebar.item icon="wrench-screwdriver" :href="route('repair-orders.index')" :current="request()->routeIs('repair-orders.*')" wire:navigate>
+                            Reparaciones
+                        </flux:sidebar.item>
+                    @endcan
+                    @can('viewAny', App\Models\Product::class)
+                        <flux:sidebar.item icon="cube" :href="route('products.index')" :current="request()->routeIs('products.*')" wire:navigate>
+                            Productos
+                        </flux:sidebar.item>
+                    @endcan
+                    @can('create', App\Models\Product::class)
+                        <flux:sidebar.item icon="printer" :href="route('stickers.index')" :current="request()->routeIs('stickers.index')" wire:navigate>
+                            Impresión
+                        </flux:sidebar.item>
+                    @endcan
                 </flux:sidebar.group>
+
+                @php
+                    $user = auth()->user();
+                    $canManageHomepage = (bool) $user->canManageSystem();
+                    $canManageUsers = $user->isAdmin();
+                    $showConfig = $user->can('create', App\Models\Warehouse::class)
+                        || $user->can('create', App\Models\Family::class)
+                        || $user->can('create', App\Models\Attribute::class)
+                        || $canManageHomepage
+                        || $canManageUsers;
+                @endphp
+
+                @if ($showConfig)
+                    <flux:sidebar.group
+                        heading="Configuración"
+                        icon="cog-6-tooth"
+                        expandable
+                        :expanded="request()->routeIs('warehouses.*', 'families.*', 'attributes.*', 'homepage.*', 'users.*')"
+                        class="grid"
+                    >
+                        @if ($canManageUsers)
+                            <flux:sidebar.item icon="users" :href="route('users.index')" :current="request()->routeIs('users.*')" wire:navigate>
+                                Usuarios
+                            </flux:sidebar.item>
+                        @endif
+                        @can('create', App\Models\Warehouse::class)
+                            <flux:sidebar.item icon="building-storefront" :href="route('warehouses.index')" :current="request()->routeIs('warehouses.*')" wire:navigate>
+                                Almacenes
+                            </flux:sidebar.item>
+                        @endcan
+                        @can('create', App\Models\Family::class)
+                            <flux:sidebar.item icon="squares-2x2" :href="route('families.index')" :current="request()->routeIs('families.*')" wire:navigate>
+                                Familias
+                            </flux:sidebar.item>
+                        @endcan
+                        @can('create', App\Models\Attribute::class)
+                            <flux:sidebar.item icon="tag" :href="route('attributes.index')" :current="request()->routeIs('attributes.*')" wire:navigate>
+                                Atributos
+                            </flux:sidebar.item>
+                        @endcan
+                        @if ($canManageHomepage)
+                            <flux:sidebar.item icon="photo" :href="route('homepage.index')" :current="request()->routeIs('homepage.*')" wire:navigate>
+                                Homepage
+                            </flux:sidebar.item>
+                        @endif
+                    </flux:sidebar.group>
+                @endif
             </flux:sidebar.nav>
 
             <flux:spacer />
-
-            <flux:sidebar.nav>
-                <flux:sidebar.item icon="folder-git-2" href="https://github.com/laravel/livewire-starter-kit" target="_blank">
-                    {{ __('Repository') }}
-                </flux:sidebar.item>
-
-                <flux:sidebar.item icon="book-open-text" href="https://laravel.com/docs/starter-kits#livewire" target="_blank">
-                    {{ __('Documentation') }}
-                </flux:sidebar.item>
-            </flux:sidebar.nav>
 
             <x-desktop-user-menu class="hidden lg:block" :name="auth()->user()->name" />
         </flux:sidebar>
