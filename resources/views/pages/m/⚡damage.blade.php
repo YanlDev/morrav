@@ -1,12 +1,11 @@
 <?php
 
-use App\Models\Movement;
-use App\Models\MovementLine;
+use App\Enums\DamageReason;
 use App\Models\Sku;
 use App\Models\Warehouse;
+use App\Services\Damage\DamageService;
 use Flux\Flux;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Layout;
 use Livewire\Attributes\Title;
@@ -23,6 +22,8 @@ class extends Component {
     public ?int $warehouseId = null;
 
     public ?float $quantity = 1;
+
+    public ?string $reasonCode = null;
 
     public string $notes = '';
 
@@ -87,60 +88,30 @@ class extends Component {
             'warehouseId' => ['required', 'integer', 'exists:warehouses,id'],
             'skuId' => ['required', 'integer', 'exists:skus,id'],
             'quantity' => ['required', 'numeric', 'gt:0'],
+            'reasonCode' => ['nullable', 'string', 'in:'.implode(',', array_keys(DamageReason::options()))],
             'notes' => ['nullable', 'string', 'max:255'],
         ]);
 
-        if ((float) $this->quantity > $this->availableStock) {
-            Flux::toast(variant: 'danger', text: "Solo hay {$this->availableStock} unidades disponibles.");
+        $sku = Sku::findOrFail($this->skuId);
+        $warehouse = Warehouse::findOrFail($this->warehouseId);
+
+        try {
+            app(DamageService::class)->report(
+                user: Auth::user(),
+                sku: $sku,
+                warehouse: $warehouse,
+                quantity: (float) $this->quantity,
+                reason: $this->reasonCode ? DamageReason::from($this->reasonCode) : null,
+                notes: $this->notes !== '' ? $this->notes : null,
+            );
+        } catch (\RuntimeException $e) {
+            Flux::toast(variant: 'danger', text: $e->getMessage());
 
             return;
         }
-
-        $workshop = Warehouse::query()->where('type', 'workshop')->where('active', true)->first();
-
-        if (! $workshop) {
-            Flux::toast(variant: 'danger', text: 'No hay taller configurado.');
-
-            return;
-        }
-
-        DB::transaction(function () use ($workshop) {
-            $note = $this->notes !== '' ? $this->notes : null;
-            $reason = 'Reportado dañado'.($note ? ': '.$note : '');
-
-            $movement = Movement::create([
-                'number' => 'MOV-'.str_pad((string) ((Movement::max('id') ?? 0) + 1), 6, '0', STR_PAD_LEFT),
-                'type' => 'transfer',
-                'occurred_at' => now(),
-                'reason' => $reason,
-                'origin_warehouse_id' => $this->warehouseId,
-                'destination_warehouse_id' => $workshop->id,
-                'status' => 'confirmed',
-                'created_by' => Auth::id(),
-                'confirmed_by' => Auth::id(),
-                'confirmed_at' => now(),
-            ]);
-
-            MovementLine::create([
-                'movement_id' => $movement->id,
-                'sku_id' => $this->skuId,
-                'warehouse_id' => $this->warehouseId,
-                'direction' => 'out',
-                'quantity' => $this->quantity,
-                'notes' => $note,
-            ]);
-            MovementLine::create([
-                'movement_id' => $movement->id,
-                'sku_id' => $this->skuId,
-                'warehouse_id' => $workshop->id,
-                'direction' => 'in',
-                'quantity' => $this->quantity,
-                'notes' => $note,
-            ]);
-        });
 
         Flux::toast(variant: 'success', text: 'Reporte registrado. Stock movido al taller.');
-        $this->reset(['scannedCode', 'skuId', 'quantity', 'notes']);
+        $this->reset(['scannedCode', 'skuId', 'quantity', 'reasonCode', 'notes']);
         $this->quantity = 1;
     }
 }; ?>
@@ -236,7 +207,16 @@ class extends Component {
 
             <flux:input wire:model="quantity" type="number" step="1" min="1" :max="$this->availableStock" label="Cantidad dañada" inputmode="numeric" />
 
-            <flux:textarea wire:model="notes" label="Motivo" rows="2" placeholder="Pata rota, tela manchada..." maxlength="255" />
+            <flux:field>
+                <flux:label>Tipo de daño</flux:label>
+                <flux:select wire:model="reasonCode" placeholder="Selecciona una causa">
+                    @foreach (DamageReason::options() as $value => $label)
+                        <flux:select.option :value="$value">{{ $label }}</flux:select.option>
+                    @endforeach
+                </flux:select>
+            </flux:field>
+
+            <flux:textarea wire:model="notes" label="Detalles" rows="2" placeholder="Pata rota, tela manchada..." maxlength="255" />
 
             <div class="mt-auto flex flex-col gap-2">
                 <flux:button variant="danger" wire:click="report" class="h-14 text-base" icon="exclamation-triangle">

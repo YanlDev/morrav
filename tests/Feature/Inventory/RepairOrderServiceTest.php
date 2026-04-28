@@ -5,6 +5,7 @@ use App\Models\MovementLine;
 use App\Models\Sku;
 use App\Models\User;
 use App\Models\Warehouse;
+use App\Services\Damage\DamageService;
 use App\Services\Repair\RepairOrderService;
 
 beforeEach(function () {
@@ -36,6 +37,28 @@ function placeInWorkshop(Sku $sku, Warehouse $workshop, float $qty, User $user):
         'movement_id' => $movement->id,
         'sku_id' => $sku->id,
         'warehouse_id' => $workshop->id,
+        'direction' => 'in',
+        'quantity' => $qty,
+    ]);
+}
+
+/**
+ * Mete stock en una tienda mediante un inbound confirmado. Sirve para
+ * luego pasar por DamageService y trasladarlo al taller con su reporte.
+ */
+function seedStoreStockForRepair(Sku $sku, Warehouse $store, float $qty, User $user): void
+{
+    $movement = Movement::factory()->confirmed()->create([
+        'type' => 'inbound',
+        'destination_warehouse_id' => $store->id,
+        'created_by' => $user->id,
+        'confirmed_by' => $user->id,
+    ]);
+
+    MovementLine::create([
+        'movement_id' => $movement->id,
+        'sku_id' => $sku->id,
+        'warehouse_id' => $store->id,
         'direction' => 'in',
         'quantity' => $qty,
     ]);
@@ -214,6 +237,74 @@ it('close rejects when order is already closed', function () {
 
     expect(fn () => $this->service->cancel($order->fresh(), $this->user))
         ->toThrow(RuntimeException::class, 'ya está cerrada');
+});
+
+it('open links damage reports to the created line and sums their quantities', function () {
+    $sku = Sku::factory()->create();
+
+    // Sembramos stock en tienda y reportamos 2 daños distintos a través
+    // del DamageService — esto deja el stock en taller y dos reportes pendientes.
+    seedStoreStockForRepair($sku, $this->store, 8, $this->user);
+
+    $damage = app(DamageService::class);
+    $r1 = $damage->report($this->user, $sku, $this->store, 2, notes: 'Pata floja');
+    $r2 = $damage->report($this->user, $sku, $this->store, 3, notes: 'Tela rasgada');
+
+    $order = $this->service->open($this->user, [
+        [
+            'sku_id' => $sku->id,
+            'damage_report_ids' => [$r1->id, $r2->id],
+        ],
+    ]);
+
+    $line = $order->lines->first();
+
+    expect((float) $line->quantity_claimed)->toBe(5.0)
+        ->and($r1->fresh()->repair_order_line_id)->toBe($line->id)
+        ->and($r2->fresh()->repair_order_line_id)->toBe($line->id)
+        ->and($line->damageReports)->toHaveCount(2);
+});
+
+it('open rejects damage reports that belong to another sku', function () {
+    $skuA = Sku::factory()->create();
+    $skuB = Sku::factory()->create();
+    seedStoreStockForRepair($skuA, $this->store, 5, $this->user);
+
+    $report = app(DamageService::class)->report($this->user, $skuA, $this->store, 2);
+
+    expect(fn () => $this->service->open($this->user, [
+        ['sku_id' => $skuB->id, 'damage_report_ids' => [$report->id]],
+    ]))->toThrow(RuntimeException::class, 'no pertenece');
+});
+
+it('open rejects already-claimed damage reports', function () {
+    $sku = Sku::factory()->create();
+    seedStoreStockForRepair($sku, $this->store, 5, $this->user);
+
+    $report = app(DamageService::class)->report($this->user, $sku, $this->store, 2);
+
+    $this->service->open($this->user, [
+        ['sku_id' => $sku->id, 'damage_report_ids' => [$report->id]],
+    ]);
+
+    expect(fn () => $this->service->open($this->user, [
+        ['sku_id' => $sku->id, 'damage_report_ids' => [$report->id]],
+    ]))->toThrow(RuntimeException::class, 'ya está asignado');
+});
+
+it('open rejects when quantity_claimed disagrees with damage report sum', function () {
+    $sku = Sku::factory()->create();
+    seedStoreStockForRepair($sku, $this->store, 5, $this->user);
+
+    $report = app(DamageService::class)->report($this->user, $sku, $this->store, 2);
+
+    expect(fn () => $this->service->open($this->user, [
+        [
+            'sku_id' => $sku->id,
+            'quantity_claimed' => 5,
+            'damage_report_ids' => [$report->id],
+        ],
+    ]))->toThrow(RuntimeException::class, 'no coincide');
 });
 
 it('repairableSkus returns only SKUs with available workshop stock', function () {

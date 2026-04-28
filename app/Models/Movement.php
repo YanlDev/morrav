@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 #[Fillable([
     'number',
@@ -47,6 +48,11 @@ class Movement extends Model
     public function lines(): HasMany
     {
         return $this->hasMany(MovementLine::class);
+    }
+
+    public function damageReport(): HasOne
+    {
+        return $this->hasOne(DamageReport::class);
     }
 
     public function creator(): BelongsTo

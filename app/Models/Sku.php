@@ -58,6 +58,11 @@ class Sku extends Model
         return $this->hasMany(MovementLine::class);
     }
 
+    public function damageReports(): HasMany
+    {
+        return $this->hasMany(DamageReport::class);
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');

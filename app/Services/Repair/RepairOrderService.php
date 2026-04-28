@@ -2,6 +2,7 @@
 
 namespace App\Services\Repair;
 
+use App\Models\DamageReport;
 use App\Models\Movement;
 use App\Models\MovementLine;
 use App\Models\RepairOrder;
@@ -40,9 +41,15 @@ class RepairOrderService
 
     /**
      * Abre una nueva orden de reparación con sus líneas. Cada entrada de
-     * `$linesData` debe ser `['sku_id' => int, 'quantity_claimed' => float]`.
+     * `$linesData` debe tener `sku_id` y, opcionalmente:
+     * - `quantity_claimed`: cantidad a reclamar (obligatorio si no se pasan
+     *   `damage_report_ids`).
+     * - `damage_report_ids`: lista de reportes pendientes para vincular a la
+     *   línea. Si se proveen, su suma define `quantity_claimed` (debe coincidir
+     *   con `quantity_claimed` si también se envía) y todos deben pertenecer
+     *   al mismo SKU y estar sin reclamar.
      *
-     * @param  array<int, array{sku_id: int, quantity_claimed: float, notes?: string|null}>  $linesData
+     * @param  array<int, array{sku_id: int, quantity_claimed?: float, notes?: string|null, damage_report_ids?: array<int, int>}>  $linesData
      */
     public function open(User $user, array $linesData, ?string $notes = null): RepairOrder
     {
@@ -62,12 +69,52 @@ class RepairOrderService
 
             foreach ($linesData as $line) {
                 $sku = Sku::lockForUpdate()->findOrFail($line['sku_id']);
-                $available = $this->availableForRepair($sku, $workshop);
-                $requested = (float) $line['quantity_claimed'];
+                $reportIds = array_values(array_unique(array_map('intval', $line['damage_report_ids'] ?? [])));
+
+                $reports = $reportIds === []
+                    ? collect()
+                    : DamageReport::query()
+                        ->whereIn('id', $reportIds)
+                        ->lockForUpdate()
+                        ->get();
+
+                if ($reports->count() !== count($reportIds)) {
+                    throw new RuntimeException('Uno o más reportes de daño no existen.');
+                }
+
+                foreach ($reports as $report) {
+                    if ($report->sku_id !== $sku->id) {
+                        throw new RuntimeException(
+                            "El reporte {$report->id} no pertenece al SKU {$sku->internal_code}."
+                        );
+                    }
+
+                    if ($report->repair_order_line_id !== null) {
+                        throw new RuntimeException(
+                            "El reporte {$report->id} ya está asignado a otra orden."
+                        );
+                    }
+                }
+
+                $reportsTotal = (float) $reports->sum('quantity');
+
+                $requested = $reportIds === []
+                    ? (float) ($line['quantity_claimed'] ?? 0)
+                    : (isset($line['quantity_claimed'])
+                        ? (float) $line['quantity_claimed']
+                        : $reportsTotal);
+
+                if ($reportIds !== [] && abs($requested - $reportsTotal) > 0.001) {
+                    throw new RuntimeException(
+                        "La suma de los reportes ({$reportsTotal}) no coincide con quantity_claimed ({$requested})."
+                    );
+                }
 
                 if ($requested <= 0) {
                     throw new RuntimeException("Cantidad inválida para SKU {$sku->internal_code}.");
                 }
+
+                $available = $this->availableForRepair($sku, $workshop);
 
                 if ($requested > $available) {
                     throw new RuntimeException(
@@ -75,15 +122,20 @@ class RepairOrderService
                     );
                 }
 
-                RepairOrderLine::create([
+                $orderLine = RepairOrderLine::create([
                     'repair_order_id' => $order->id,
                     'sku_id' => $sku->id,
                     'quantity_claimed' => $requested,
                     'notes' => $line['notes'] ?? null,
                 ]);
+
+                if ($reportIds !== []) {
+                    DamageReport::whereIn('id', $reportIds)
+                        ->update(['repair_order_line_id' => $orderLine->id]);
+                }
             }
 
-            return $order->fresh(['lines.sku', 'opener']);
+            return $order->fresh(['lines.sku', 'lines.damageReports', 'opener']);
         });
     }
 
